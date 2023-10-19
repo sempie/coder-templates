@@ -114,9 +114,6 @@ resource "coder_agent" "main" {
   startup_script         = <<-EOT
     set -e
 
-    # install ca-certificates and add my-ca.crt 
-    sudo apt install -y ca-certificates && sudo cp /ca-cert/${var.cert_name}.crt /usr/local/share/ca-certificates/ && sudo update-ca-certificates
-
     # install and start code-server
     curl -fsSL https://code-server.dev/install.sh | sh -s -- --method=standalone --prefix=/tmp/code-server --version 4.11.0
     /tmp/code-server/bin/code-server --auth none --port 13337 >/tmp/code-server.log 2>&1 &
@@ -226,6 +223,35 @@ resource "kubernetes_persistent_volume_claim" "home" {
   }
 }
 
+resource "kubernetes_persistent_volume_claim" "certs" {
+  metadata {
+    name      = "coder-${lower(data.coder_workspace.me.owner)}-${lower(data.coder_workspace.me.name)}-certs"
+    namespace = var.namespace
+    labels = {
+      "app.kubernetes.io/name"     = "coder-pvc"
+      "app.kubernetes.io/instance" = "coder-pvc-${lower(data.coder_workspace.me.owner)}-${lower(data.coder_workspace.me.name)}"
+      "app.kubernetes.io/part-of"  = "coder"
+      //Coder-specific labels.
+      "com.coder.resource"       = "true"
+      "com.coder.workspace.id"   = data.coder_workspace.me.id
+      "com.coder.workspace.name" = data.coder_workspace.me.name
+      "com.coder.user.id"        = data.coder_workspace.me.owner_id
+      "com.coder.user.username"  = data.coder_workspace.me.owner
+    }
+    annotations = {
+      "com.coder.user.email" = data.coder_workspace.me.owner_email
+    }
+  }
+  wait_until_bound = false
+  spec {
+    access_modes = ["ReadWriteOnce"]
+    resources {
+      requests = {
+        storage = "100Mi"
+      }
+    }
+  }
+}
 resource "kubernetes_deployment" "main" {
   count = data.coder_workspace.me.start_count
   depends_on = [
@@ -302,6 +328,22 @@ resource "kubernetes_deployment" "main" {
             read_only  = false
           }
           volume_mount {
+            name       = "certs"
+            mount_path = "/etc/ssl/certs"
+          }
+        }
+        init_container {
+          name  = "install-ca"
+          image = "codercom/enterprise-base:ubuntu"
+          command = [
+            "/bin/sh", "-c", "sudo cp /ca-cert/${var.cert_name}.crt /usr/local/share/ca-certificates/ && sudo update-ca-certificates"
+          ]
+
+          volume_mount {
+            name       = "certs"
+            mount_path = "/etc/ssl/certs"
+          }
+          volume_mount {
             mount_path = "/ca-cert"
             name       = "my-ca"
             read_only  = true
@@ -312,6 +354,14 @@ resource "kubernetes_deployment" "main" {
           name = "home"
           persistent_volume_claim {
             claim_name = kubernetes_persistent_volume_claim.home.metadata.0.name
+            read_only  = false
+          }
+        }
+
+        volume {
+          name = "certs"
+          persistent_volume_claim {
+            claim_name = kubernetes_persistent_volume_claim.certs.metadata.0.name
             read_only  = false
           }
         }
