@@ -223,6 +223,9 @@ resource "kubernetes_persistent_volume_claim" "home" {
   }
 }
 
+####
+# PVC needed for CA certificate trust store
+####
 resource "kubernetes_persistent_volume_claim" "certs" {
   metadata {
     name      = "coder-${lower(data.coder_workspace.me.owner)}-${lower(data.coder_workspace.me.name)}-certs"
@@ -327,11 +330,19 @@ resource "kubernetes_deployment" "main" {
             name       = "home"
             read_only  = false
           }
+
+          ####
+          # Volume mount needed for CA certificate trust store
+          ####
           volume_mount {
             name       = "certs"
             mount_path = "/etc/ssl/certs"
           }
         }
+
+        ####
+        # Init container needed to install CA certificate to trust store volume
+        ####
         init_container {
           name  = "install-ca"
           image = "codercom/enterprise-base:ubuntu"
@@ -358,6 +369,9 @@ resource "kubernetes_deployment" "main" {
           }
         }
 
+        ####
+        # Volume needed for CA certificate trust store
+        ####
         volume {
           name = "certs"
           persistent_volume_claim {
@@ -366,6 +380,9 @@ resource "kubernetes_deployment" "main" {
           }
         }
 
+        ####
+        # Volume needed to mount CA certificate within container
+        ####
         volume {
           name = "my-ca"
           secret {
