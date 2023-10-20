@@ -223,38 +223,6 @@ resource "kubernetes_persistent_volume_claim" "home" {
   }
 }
 
-####
-# PVC needed for CA certificate trust store
-####
-resource "kubernetes_persistent_volume_claim" "certs" {
-  metadata {
-    name      = "coder-${lower(data.coder_workspace.me.owner)}-${lower(data.coder_workspace.me.name)}-certs"
-    namespace = var.namespace
-    labels = {
-      "app.kubernetes.io/name"     = "coder-pvc"
-      "app.kubernetes.io/instance" = "coder-pvc-${lower(data.coder_workspace.me.owner)}-${lower(data.coder_workspace.me.name)}"
-      "app.kubernetes.io/part-of"  = "coder"
-      //Coder-specific labels.
-      "com.coder.resource"       = "true"
-      "com.coder.workspace.id"   = data.coder_workspace.me.id
-      "com.coder.workspace.name" = data.coder_workspace.me.name
-      "com.coder.user.id"        = data.coder_workspace.me.owner_id
-      "com.coder.user.username"  = data.coder_workspace.me.owner
-    }
-    annotations = {
-      "com.coder.user.email" = data.coder_workspace.me.owner_email
-    }
-  }
-  wait_until_bound = false
-  spec {
-    access_modes = ["ReadWriteOnce"]
-    resources {
-      requests = {
-        storage = "100Mi"
-      }
-    }
-  }
-}
 resource "kubernetes_deployment" "main" {
   count = data.coder_workspace.me.start_count
   depends_on = [
@@ -374,9 +342,8 @@ resource "kubernetes_deployment" "main" {
         ####
         volume {
           name = "certs"
-          persistent_volume_claim {
-            claim_name = kubernetes_persistent_volume_claim.certs.metadata.0.name
-            read_only  = false
+          empty_dir {
+            size_limit = 0.05
           }
         }
 

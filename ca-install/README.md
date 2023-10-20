@@ -3,6 +3,7 @@ This template provides an example where a CA certificate can be mounted within a
 
 This is useful in cases where using an internal CA or self-signed certificate and not wanting to create a custom image that includes the certificate.
 
+It uses an emptyDir volume for the trusted certificates mounted to /etc/ssl/certs and relies on the ca-certificates package.
 
 ## Steps
 
