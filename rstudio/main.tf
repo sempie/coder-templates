@@ -195,6 +195,13 @@ if [[ ! -z "${data.coder_parameter.dotfiles_url.value}" ]]; then
   coder dotfiles -y ${data.coder_parameter.dotfiles_url.value}
 fi
 
+# enable git auth for rstudio 
+echo "GIT_SSH_COMMAND='$GIT_SSH_COMMAND'" | sudo tee -a /usr/lib/R/etc/Renviron.site
+echo "GIT_ASKPASS=$GIT_ASKPASS" | sudo tee -a /usr/lib/R/etc/Renviron.site
+echo "CODER_AGENT_URL=$CODER_AGENT_URL" | sudo tee -a /usr/lib/R/etc/Renviron.site
+echo "CODER_AGENT_AUTH=token" | sudo tee -a /usr/lib/R/etc/Renviron.site
+echo "CODER_AGENT_TOKEN=$CODER_AGENT_TOKEN" | sudo tee -a /usr/lib/R/etc/Renviron.site
+
 EOT
 }
 
